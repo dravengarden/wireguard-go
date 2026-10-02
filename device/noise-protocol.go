@@ -426,6 +426,9 @@ func (device *Device) ConsumeMessageInitiation(msg *MessageInitiation, endpoint 
 		device.log.Verbosef("%v - ConsumeMessageInitiation: handshake flood", peer)
 		return nil
 	}
+	if !authorizeTransport(endpoint, handshake.remoteStatic) {
+		return nil
+	}
 
 	// update handshake state
 
@@ -520,7 +523,7 @@ func (device *Device) CreateMessageResponse(peer *Peer) (*MessageResponse, error
 	return &msg, nil
 }
 
-func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
+func (device *Device) ConsumeMessageResponse(msg *MessageResponse, endpoints ...conn.Endpoint) *Peer {
 	if msg.Type != MessageResponseType {
 		return nil
 	}
@@ -601,6 +604,11 @@ func (device *Device) ConsumeMessageResponse(msg *MessageResponse) *Peer {
 
 	if !ok {
 		return nil
+	}
+	for _, endpoint := range endpoints {
+		if !authorizeTransport(endpoint, handshake.remoteStatic) {
+			return nil
+		}
 	}
 
 	// update handshake state

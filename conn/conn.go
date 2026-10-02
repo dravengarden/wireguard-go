@@ -122,6 +122,15 @@ type PeerAwareEndpoint interface {
 	FromPeer(peerPublicKey [32]byte)
 }
 
+// PeerAuthorizingEndpoint optionally restricts the transport of a
+// cryptographically authenticated peer. It is checked after successful Noise
+// authentication or data decryption, before state acceptance, endpoint roaming,
+// timers, replies, or delivery to the TUN. Endpoints without it retain the
+// existing behavior. Implementations must be bounded and concurrency-safe.
+type PeerAuthorizingEndpoint interface {
+	AuthorizePeer(peerPublicKey [32]byte) bool
+}
+
 var (
 	ErrBindAlreadyOpen   = errors.New("bind is already open")
 	ErrWrongEndpointType = errors.New("endpoint type does not correspond with bind type")

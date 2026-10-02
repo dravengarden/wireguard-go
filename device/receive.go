@@ -402,7 +402,7 @@ func (device *Device) RoutineHandshake(id int) {
 
 			// consume response
 
-			peer := device.ConsumeMessageResponse(&msg)
+			peer := device.ConsumeMessageResponse(&msg, elem.endpoint)
 			if peer == nil {
 				device.log.Verbosef("Received invalid response message from %s", elem.endpoint.DstToString())
 				goto skip
@@ -487,6 +487,9 @@ func (peer *Peer) processInboundContainer(elemsContainer *QueueInboundElementsCo
 	for i, elem := range elems {
 		if elem.packet == nil {
 			// decryption failed
+			continue
+		}
+		if !authorizeTransport(elem.endpoint, peer.handshake.remoteStatic) {
 			continue
 		}
 

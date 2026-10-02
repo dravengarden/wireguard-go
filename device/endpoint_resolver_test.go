@@ -185,14 +185,19 @@ func generateTestKeyPair(t *testing.T) (privateHex string, publicHex string) {
 	return hex.EncodeToString(privateKey[:]), hex.EncodeToString(publicKey)
 }
 
-func startTestDevice(t *testing.T, name string, privateHex string, peerPublicHex string, peerAllowedIP string) (*device.Device, *testTUN) {
+func startTestDevice(t *testing.T, name string, privateHex string, peerPublicHex string, peerAllowedIP string, bindings ...conn.Bind) (*device.Device, *testTUN) {
 	tunDevice := &testTUN{
-		name:    name,
-		inbound: make(chan []byte, 16),
-		events:  make(chan tun.Event, 1),
-		done:    make(chan struct{}),
+		name:     name,
+		inbound:  make(chan []byte, 16),
+		outbound: make(chan []byte, 16),
+		events:   make(chan tun.Event, 1),
+		done:     make(chan struct{}),
 	}
-	wgDevice := device.NewDevice(context.Background(), tunDevice, conn.NewStdNetBind(nil), device.NewLogger(device.LogLevelError, name+": "), 0)
+	bind := conn.Bind(conn.NewStdNetBind(nil))
+	if len(bindings) > 0 {
+		bind = bindings[0]
+	}
+	wgDevice := device.NewDevice(context.Background(), tunDevice, bind, device.NewLogger(device.LogLevelError, name+": "), 0)
 	err := wgDevice.IpcSet("private_key=" + privateHex +
 		"\npublic_key=" + peerPublicHex +
 		"\nallowed_ip=" + peerAllowedIP)
@@ -268,10 +273,11 @@ func buildTestPacket() []byte {
 }
 
 type testTUN struct {
-	name    string
-	inbound chan []byte
-	events  chan tun.Event
-	done    chan struct{}
+	name     string
+	inbound  chan []byte
+	outbound chan []byte
+	events   chan tun.Event
+	done     chan struct{}
 }
 
 func (t *testTUN) File() *os.File { return nil }
@@ -287,6 +293,14 @@ func (t *testTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 }
 
 func (t *testTUN) Write(bufs [][]byte, offset int) (int, error) {
+	if t.outbound != nil {
+		for _, b := range bufs {
+			select {
+			case t.outbound <- append([]byte(nil), b[offset:]...):
+			default:
+			}
+		}
+	}
 	return len(bufs), nil
 }
 
